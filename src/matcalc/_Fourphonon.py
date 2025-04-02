@@ -1,0 +1,1 @@
+"""Calculator for three-phonon lattice thermal conductivity."""

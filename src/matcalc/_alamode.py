@@ -1,0 +1,1 @@
+"""Calculator for force constants extraction and lattice thermal conductivity."""
