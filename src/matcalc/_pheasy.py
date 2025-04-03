@@ -88,6 +88,10 @@ class PhononCalc(PropCalc):
     write_total_dos: bool | str | Path = False
     write_phonon: bool | str | Path = True
 
+    # set up a variable to select the fitting method, like fd, lasso, md terejectory for pheasy
+    fitting_method: str = "LASSO"
+    num_snapshots: int = 10
+
     def __post_init__(self) -> None:
         """Set default paths for where to save output files."""
         # map True to canonical default path, False to "" and Path to str
@@ -139,13 +143,40 @@ class PhononCalc(PropCalc):
             structure_in = result["final_structure"]
         cell = get_phonopy_structure(structure_in)
         phonon = phonopy.Phonopy(cell, self.supercell_matrix)  # type: ignore[arg-type]
-        phonon.generate_displacements(distance=self.atom_disp)
+
+        if self.fitting_method == "FDM":
+            phonon.generate_displacements(distance=self.atom_disp)
+        
+        elif self.fitting_method == "LASSO":
+            phonon.generate_displacements(distance=self.atom_disp, number_of_snapshots=self.num_snapshots, random_seed=42)
+        
+        elif self.fitting_method == "MD":
+            #pass
+            #phonon.generate_displacements(distance=self.atom_disp, number_of_snapshots=self.num_snapshots)
+            print("MD fitting method is not implemented yet.")
+
         disp_supercells = phonon.supercells_with_displacements
+        # to get a better result, I suggest to deduct the forces from the supercell
+        disp_supercells = disp_supercells.append(phonon.supercell)  # type:ignore[union-attr]
+
         phonon.forces = [  # type: ignore[assignment]
             _calc_forces(self.calculator, supercell)
             for supercell in disp_supercells  # type:ignore[union-attr]
             if supercell is not None
         ]
+
+        # To deduct the forces from the supercell for all the displacements
+        phonon.forces = phonon.forces - phonon.forces[-1]
+        # get the forces for rest of displacements
+        phonon.forces = phonon.forces[:-1]
+        
+
+
+
+
+
+
+
         phonon.produce_force_constants()
         phonon.run_mesh()
         phonon.run_thermal_properties(t_step=self.t_step, t_max=self.t_max, t_min=self.t_min)
