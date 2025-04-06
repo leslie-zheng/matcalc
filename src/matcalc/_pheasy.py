@@ -15,6 +15,11 @@ from pymatgen.io.phonopy import get_phonopy_structure, get_pmg_structure
 from ._base import PropCalc
 from ._relaxation import RelaxCalc
 
+from phonopy.interface.vasp import write_vasp
+import numpy as np
+import pickle
+
+
 if TYPE_CHECKING:
     from pathlib import Path
     from typing import Any
@@ -169,6 +174,42 @@ class PhononCalc(PropCalc):
             if supercell is not None
         ]
 
+        # Write the POSCAR and SPOSCAR files for the input of pheasy code
+        supercell = phonon.get_supercell()
+        write_vasp("POSCAR", cell)
+        write_vasp("SPOSCAR", supercell)
+
+        # get the force-displacement dataset from previous calculations
+        dataset_forces = [np.array(forces) for forces in displacement_data["forces"]]
+        dataset_forces_array = np.array(dataset_forces)
+
+        # To deduct the residual forces on an equilibrium structure to eliminate the
+        # fitting error
+        dataset_forces_array_rr = dataset_forces_array - dataset_forces_array[-1, :, :]
+
+        # force matrix on the displaced structures
+        dataset_forces_array_disp = dataset_forces_array_rr[:-1, :, :]
+        dataset_disps = [
+            np.array(disps.cart_coords)
+            for disps in displacement_data["displaced_structures"]
+        ]
+
+        # get the displacement dataset
+        dataset_disps_array_rr = np.round(
+            (dataset_disps - supercell.get_positions()), decimals=16
+        ).astype('double')
+        dataset_disps_array_use = dataset_disps_array_rr[:-1, :, :]
+
+        # get the number of displacements for harmonic phonon calculation
+        num_har = dataset_disps_array_use.shape[0]
+
+        # save the displacement and force matrix in the current directory
+        # for the future use by pheasy code
+        with open("disp_matrix.pkl", "wb") as file:
+            pickle.dump(dataset_disps_array_use, file)
+        with open("force_matrix.pkl", "wb") as file:
+            pickle.dump(dataset_forces_array_disp, file)
+        
         
 
 
@@ -176,6 +217,11 @@ class PhononCalc(PropCalc):
 
 
 
+
+
+
+
+        
         # To deduct the forces from the supercell for all the displacements
         phonon.forces = phonon.forces - phonon.forces[-1]
         # get the forces for rest of displacements
