@@ -155,6 +155,10 @@ class PhononCalc(PropCalc):
             #phonon.generate_displacements(distance=self.atom_disp, number_of_snapshots=self.num_snapshots)
             print("MD fitting method is not implemented yet.")
 
+        else:
+            raise ValueError(f"Unknown fitting method: {self.fitting_method}")
+
+            
         disp_supercells = phonon.supercells_with_displacements
         # to get a better result, I suggest to deduct the forces from the supercell
         disp_supercells = disp_supercells.append(phonon.supercell)  # type:ignore[union-attr]
@@ -164,6 +168,13 @@ class PhononCalc(PropCalc):
             for supercell in disp_supercells  # type:ignore[union-attr]
             if supercell is not None
         ]
+
+        
+
+
+
+
+
 
         # To deduct the forces from the supercell for all the displacements
         phonon.forces = phonon.forces - phonon.forces[-1]
